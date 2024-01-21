@@ -1,21 +1,21 @@
 import logging
-from typing import Any, Iterable, Dict
+from typing import Any, Iterable, Dict, Union
 from PIL.Image import Image
 
-from transformers import Pipeline
+from transformers import pipeline
 
 
 LOGGER = logging.getLogger(__name__)
 
 
-class Predictor:
+class Estimator:
 
     def __init__(self) -> None:
         pass
 
     def __call__(
         self,
-        images: Iterable[Image],
+        images: Union[Iterable[Image], Image],
         *args: Any, 
         **kwargs: Any
     ) -> Iterable[Dict]:
@@ -31,10 +31,10 @@ class Predictor:
             ```
         """
         LOGGER.info("Start inference.")
-        pipe  = Pipeline("document-question-answering", model="impira/layoutlm-invoices", *args, **kwargs)
+        pipe  = pipeline("document-question-answering", model="impira/layoutlm-invoices", *args, **kwargs)
         predictions = pipe(
             images,
-            "What is the invoice number?"
+            "What is the total gross worth of this invoice?"
         )
         LOGGER.info(f"End prediction. Output: {predictions}")
         return predictions
