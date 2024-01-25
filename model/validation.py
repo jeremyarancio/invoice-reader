@@ -145,11 +145,11 @@ class Validation:
         return {"acc": acc}
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    validation = Validation(
-        validation_dataset_path="katanaml-org/invoices-donut-data-v1"
-    )
-    estimator = Estimator()
-    acc = validation.evaluate(estimator=estimator)
-    print(acc)
+# if __name__ == "__main__":  
+#     logging.basicConfig(level=logging.INFO)
+#     validation = Validation(
+#         validation_dataset_path="katanaml-org/invoices-donut-data-v1"
+#     )
+#     estimator = Estimator()
+#     acc = validation.evaluate(estimator=estimator)
+#     print(acc)

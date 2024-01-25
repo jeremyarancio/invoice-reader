@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Iterable, Dict, Union
+from typing import Any, Iterable, Dict
 from PIL.Image import Image
 
 from transformers import pipeline
@@ -15,11 +15,11 @@ class Estimator:
 
     def __call__(
         self,
-        images: Union[Iterable[Image], Image],
+        image: Image,
         *args: Any, 
         **kwargs: Any
     ) -> Iterable[Dict]:
-        """Predict total amount
+        """Predict "total gross worth"
 
         Args:
             image (Image): PIL image in 'RPG' format 
@@ -33,7 +33,7 @@ class Estimator:
         LOGGER.info("Start inference.")
         pipe  = pipeline("document-question-answering", model="impira/layoutlm-invoices", *args, **kwargs)
         predictions = pipe(
-            images,
+            image,
             "What is the total gross worth of this invoice?"
         )
         LOGGER.info(f"End prediction. Output: {predictions}")
