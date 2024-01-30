@@ -4,31 +4,32 @@ from PIL import Image
 
 from sagemaker.huggingface import HuggingFacePredictor
 from sagemaker import Session
-from sagemaker.serializers import DataSerializer
-from sagemaker.deserializers import JSONDeserializer
 
-from datasets import load_dataset, disable_caching
 
-disable_caching()
+def convert_to_bytes(image: Image) -> str:
+    image = Image.open(".private/invoice.png")
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    return img_str
 
-def convert_to_bytes(image: Image):
-    format = image.format if image.format else 'JPEG'
-    # BytesIO is a file-like buffer stored in memory
-    img_byte_arr = BytesIO()
-    # image.save expects a file-like as a argument
-    image.save(img_byte_arr, format=format)
-    # Turn the BytesIO object back into a bytes object
-    return img_byte_arr.getvalue()
 
 # create a serializer for the data
-image_serializer = DataSerializer(content_type='image/x-image') # using x-image to support multiple image formats
+# image_serializer = IdentitySerializer() # using x-image to support multiple image formats
 
 predictor = HuggingFacePredictor(
-    endpoint_name="huggingface-pytorch-inference-2024-01-25-18-24-08-402",
+    endpoint_name="huggingface-pytorch-inference-2024-01-30-17-40-07-790",
     sagemaker_session=Session(),
-    serializer=image_serializer
+    # serializer=IdentitySerializer()
 )
 
 image = Image.open(".private/invoice.png")
-prediction = predictor.predict(data=convert_to_bytes(image))
+prediction = predictor.predict(
+    {
+        "image": "https://www.invoicesimple.com/wp-content/uploads/2018/06/Sample-Invoice-printable.png",
+        "question": "What is the total gross amount?",
+    }
+)
 print(prediction)
+
+# ERROR: "message": "If you provide an image without word_boxes, then the pipeline will run OCR using Tesseract, but pytesseract is not available"
