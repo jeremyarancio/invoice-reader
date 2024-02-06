@@ -19,3 +19,64 @@ Basic installation from [HF article](https://www.philschmid.de/fine-tuning-layou
 sudo apt install -y tesseract-ocr
 pip install pytesseract transformers datasets seqeval tensorboard
 ```
+
+# Label studio
+
+## Type of data to import
+
+[Label studio import data OCR](https://labelstud.io/guide/predictions.html#Import-OCR-pre-annotations)
+
+```json
+[{
+  "data": {
+    "image": "/static/samples/sample.jpg" 
+  },
+
+  "predictions": [{
+    "model_version": "one",
+    "score": 0.5,
+    "result": [
+      {
+        "id": "result1",
+        "type": "rectanglelabels",        
+        "from_name": "label", "to_name": "image",
+        "original_width": 600, "original_height": 403,
+        "image_rotation": 0,
+        "value": {
+          "rotation": 0,          
+          "x": 4.98, "y": 12.82,
+          "width": 32.52, "height": 44.91,
+          "rectanglelabels": ["Airplane"]
+        }
+      },
+      {
+        "id": "result2",
+        "type": "rectanglelabels",        
+        "from_name": "label", "to_name": "image",
+        "original_width": 600, "original_height": 403,
+        "image_rotation": 0,
+        "value": {
+          "rotation": 0,          
+          "x": 75.47, "y": 82.33,
+          "width": 5.74, "height": 7.40,
+          "rectanglelabels": ["Car"]
+        }
+      },
+      {
+        "id": "result3",
+        "type": "choices",
+        "from_name": "choice", "to_name": "image",
+        "value": {
+          "choices": ["Airbus"]
+      }
+    }]
+  }]
+}]
+```
+
+## COnvert pdf into image
+
+```bash
+apt-get install poppler-utils
+pip install pdf2image
+```
