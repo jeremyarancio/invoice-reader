@@ -5,7 +5,6 @@ from typing import List, Iterator, Mapping, Optional
 from io import BytesIO
 from tqdm import tqdm
 import json
-import os
 from uuid import uuid4
 
 from datasets import load_dataset, disable_caching
@@ -25,9 +24,6 @@ S3_FOLDER = "data/training/documents/"
 DATASET_SPLIT = "validation"
 STREAMING = True
 OCR_JSON_PATH = "data/invoices_ocr_data.json"
-
-# tesseract output levels for the level of detail for the bounding boxes
-LEVELS = {"page_num": 1, "block_num": 2, "par_num": 3, "line_num": 4, "word_num": 5}
 
 
 def transform_pdf_into_image(pdf_dir: Path, png_dir: Path = False) -> List[Image.Image]:
@@ -89,36 +85,47 @@ def load_images_from_s3(bucket, prefix) -> Iterator[Image.Image]:
         if key.endswith(".png"):
             file_stream = s3.get_object(Bucket=bucket, Key=key)["Body"]
             image = Image.open(file_stream)
+            # Add the image presigned-url
+            url = s3.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={"Bucket": bucket, "Key": key},
+                ExpiresIn=21600,
+            )
+            image.filename = url
             yield image
 
 
 def prepare_data_for_ls(
-    images: Iterator[Image.Image], save_path: Optional[Path] = None
-) -> Mapping:
-    """Parse image and extract words with bboxes for Label Studio
-    """
-    output = []
+    images: Iterator[Image.Image], 
+    save_path: Optional[Path] = None
+) -> List[Mapping]:
+    """Parse image and extract words with bboxes for Label Studio."""
+    tasks = []
     for image in tqdm(images):
-        tesseract_output = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-        create_image_url(image.file)
-       
+        tesseract_output = pytesseract.image_to_data(
+            image, output_type=pytesseract.Output.DICT
+        )
+        task = convert_to_ls(image, tesseract_output)
+        tasks.append(task)
     if save_path:
         with open(save_path, "w") as f:
-            json.dump(output, f, indent=2)
-    return output
+            json.dump(tasks, f, indent=2)
+    return tasks
 
 
-def create_image_url(filepath):
+def create_image_url(filename):
     """
-    Label Studio requires image URLs, so this defines the mapping from filesystem to URLs
-    if you use ./serve_local_files.sh <my-images-dir>, the image URLs are localhost:8081/filename.png
-    Otherwise you can build links like /data/upload/filename.png to refer to the files
+    The image data in this example task references an uploaded file,
+    identified by the source_filename assigned by Label Studio after uploading the image.
+    The best way to reference image data is using presigned URLs for images stored in cloud storage, or absolute paths
+    to image data stored in local storage and added to Label Studio by syncing storage.
     """
-    filename = os.path.basename(filepath)
-    return f"http://localhost:8080/{filename}"
+    return NotImplementedError
 
 
-def convert_to_ls(image, tesseract_output: Mapping, per_level: str = "block_num"):
+def convert_to_ls(
+    image: Image.Image, tesseract_output: Mapping, default_label: str = "O"
+):
     """
     :param image: PIL image object
     :param tesseract_output: the output from tesseract
@@ -130,35 +137,19 @@ def convert_to_ls(image, tesseract_output: Mapping, per_level: str = "block_num"
 
     """
     image_width, image_height = image.size
-    per_level_idx = LEVELS[per_level]
     results = []
     all_scores = []
-    for i, level_idx in enumerate(tesseract_output["level"]):
-        if level_idx == per_level_idx:
+    for i, text in enumerate(tesseract_output["text"]):
+        if text.strip() != "" and tesseract_output["conf"][i] != "-1":
             bbox = {
                 "x": 100 * tesseract_output["left"][i] / image_width,
                 "y": 100 * tesseract_output["top"][i] / image_height,
                 "width": 100 * tesseract_output["width"][i] / image_width,
                 "height": 100 * tesseract_output["height"][i] / image_height,
                 "rotation": 0,
-                "rectangle_labels": ["O"] # Default label
             }
-
-            words, confidences = [], []
-            for j, curr_id in enumerate(tesseract_output[per_level]):
-                if curr_id != tesseract_output[per_level][i]:
-                    continue
-                word = tesseract_output["text"][j]
-                confidence = tesseract_output["conf"][j]
-                words.append(word)
-                if confidence != "-1":
-                    confidences.append(float(confidence / 100.0))
-
-            text = " ".join(words).strip()
-            if not text:
-                continue
             region_id = str(uuid4())[:10]
-            score = sum(confidences) / len(confidences) if confidences else 0
+            score = tesseract_output["conf"][i]
             bbox_result = {
                 "id": region_id,
                 "from_name": "bbox",
@@ -174,11 +165,18 @@ def convert_to_ls(image, tesseract_output: Mapping, per_level: str = "block_num"
                 "value": dict(text=[text], **bbox),
                 "score": score,
             }
-            results.extend([bbox_result, transcription_result])
+            label_result = {
+                "id": region_id,
+                "from_name": "label",
+                "to_name": "image",
+                "type": "labels",
+                "value": dict(labels=[default_label], **bbox),
+            }
+            results.extend([bbox_result, label_result, transcription_result])
             all_scores.append(score)
 
     return {
-        "data": {"ocr": create_image_url(image.filename)},
+        "data": {"ocr": image.filename},  # Presigned URL
         "predictions": [
             {
                 "result": results,
@@ -206,7 +204,7 @@ def main():
     #     prefix=S3_FOLDER
     # )
     images = load_images_from_s3(bucket=BUCKET_NAME, prefix=S3_FOLDER)
-    ocr_images(images=images, save_path=OCR_JSON_PATH)
+    prepare_data_for_ls(images=images, save_path="data/invoices_ocr_data.json")
 
 
 if __name__ == "__main__":
