@@ -1,17 +1,18 @@
 import logging
 from pathlib import Path
 from PIL import Image
-from typing import List, Iterator, Mapping, Optional
+from typing import List, Iterator, Mapping, Optional, Tuple
 from io import BytesIO
 from tqdm import tqdm
 import json
 from uuid import uuid4
 
-from datasets import load_dataset, disable_caching
+from datasets import load_dataset, disable_caching, Dataset, DatasetDict
 import pytesseract
 from pdf2image import convert_from_path
 import boto3
 from botocore.exceptions import ClientError
+import numpy as np
 
 
 disable_caching()
@@ -20,7 +21,11 @@ HF_DATASET_ID = "katanaml-org/invoices-donut-data-v1"
 PRIVATE_INVOICES_PDF_DIR = Path(".private/invoices_pdf/")
 PRIVATE_INVOICES_PNG_DIR = Path(".private/invoices_png/")
 BUCKET_NAME = "invoice-reader-project"
-S3_FOLDER = "data/training/documents/"
+S3_DOC_PREFIX = "data/training/documents/"
+S3_LS_DATA_KEY = (
+    "data/training/label-studio/project-5-at-2024-02-13-15-29-56d382e2.json"
+)
+S3_DATASET_KEY = "data/training/datasets/dataset_ocr_v1"
 DATASET_SPLIT = "validation"
 STREAMING = True
 OCR_JSON_PATH = "data/invoices_ocr_data.json"
@@ -96,8 +101,7 @@ def load_images_from_s3(bucket, prefix) -> Iterator[Image.Image]:
 
 
 def prepare_data_for_ls(
-    images: Iterator[Image.Image], 
-    save_path: Optional[Path] = None
+    images: Iterator[Image.Image], save_path: Optional[Path] = None
 ) -> List[Mapping]:
     """Parse image and extract words with bboxes for Label Studio."""
     tasks = []
@@ -186,6 +190,54 @@ def convert_to_ls(
     }
 
 
+def unormalize_bbox_from_ls(
+    bboxes: List[Tuple[int, int, int, int]], 
+    width: int, 
+    height: int
+) -> List[List]:
+    """To label documents, each bbox was normalized into 100*x0/W."""
+    x = np.array(bboxes)
+    v = (width/100, height/100, width/100, height/100)
+    X = x*v
+    return X.round(2).tolist()
+    
+
+
+def ls_to_dataset(ls_data: List[Mapping], test_size: float = 0.3) -> DatasetDict:
+    """"""
+    mapping = []
+    for idx, doc in enumerate(ls_data):
+        original_width = doc["bbox"][0]["original_width"]
+        original_height = doc["bbox"][0]["original_height"]
+        bboxes = [
+            (
+                bbox["x"], 
+                bbox["y"], 
+                bbox["x"] + bbox["width"], 
+                bbox["y"] + bbox["height"]
+            ) for bbox in doc["bbox"]
+        ]
+        bboxes = unormalize_bbox_from_ls(
+            bboxes=bboxes,
+            width=original_width,
+            height=original_height
+        )
+        labels = [label["labels"][0] for label in doc["label"]]
+        words = [word for word in doc["transcription"]]
+        mapping.append(
+            {
+                "doc_id": idx,
+                "bboxes": bboxes,
+                "words": words,
+                "labels": labels,
+                "original_width": original_width,
+                "orginal_height": original_height
+            }
+        )
+    dataset_dict = Dataset.from_list(mapping).train_test_split(test_size=test_size, shuffle=True)
+    return dataset_dict
+
+
 def main():
     # images = transform_pdf_into_image(
     #     pdf_dir=PRIVATE_INVOICES_PDF_DIR,
@@ -195,16 +247,21 @@ def main():
     #     dataset_id=HF_DATASET_ID,
     #     split=DATASET_SPLIT,
     #     bucket_name=BUCKET_NAME,
-    #     prefix=S3_FOLDER,
+    #     prefix=S3_DOC_PREFIX,
     #     streaming=STREAMING,
     # )
     # upload_local_images_to_s3(
     #     png_dir=PRIVATE_INVOICES_PNG_DIR,
     #     bucket_name=BUCKET_NAME,
-    #     prefix=S3_FOLDER
+    #     prefix=S3_DOC_PREFIX
     # )
-    images = load_images_from_s3(bucket=BUCKET_NAME, prefix=S3_FOLDER)
-    prepare_data_for_ls(images=images, save_path="data/invoices_ocr_data.json")
+    # images = load_images_from_s3(bucket=BUCKET_NAME, prefix=S3_DOC_PREFIX)
+    # prepare_data_for_ls(images=images, save_path="data/invoices_ocr_data.json")
+    s3 = boto3.client("s3")
+    ls_data = json.loads(s3.get_object(Bucket=BUCKET_NAME, Key=S3_LS_DATA_KEY)["Body"].read().decode("utf-8"))
+    dataset = ls_to_dataset(ls_data)
+    dataset.save_to_disk(f"s3://{BUCKET_NAME}/{S3_DATASET_KEY}")
+    # s3.upload_fileobj(dataset, Bucket=BUCKET_NAME, Key=S3_DATASET_KEY)
 
 
 if __name__ == "__main__":
