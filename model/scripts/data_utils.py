@@ -231,7 +231,7 @@ def ls_to_dataset(ls_data: List[Mapping], test_size: float = 0.3) -> DatasetDict
                 "words": words,
                 "labels": labels,
                 "original_width": original_width,
-                "orginal_height": original_height
+                "original_height": original_height
             }
         )
     dataset_dict = Dataset.from_list(mapping).train_test_split(test_size=test_size, shuffle=True)
