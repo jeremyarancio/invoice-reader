@@ -80,3 +80,10 @@ pip install pytesseract transformers datasets seqeval tensorboard
 apt-get install poppler-utils
 pip install pdf2image
 ```
+
+## Good AWS Sagemaker / MLOps resources
+
+* [Create SageMaker Pipelines for training, consuming and monitoring your batch use cases](https://aws.amazon.com/blogs/machine-learning/create-sagemaker-pipelines-for-training-consuming-and-monitoring-your-batch-use-cases/)
+* [Automate Machine Learning Workflows](https://aws.amazon.com/tutorials/machine-learning-tutorial-mlops-automate-ml-workflows/)
+* https://github.com/aws/amazon-sagemaker-examples/blob/main/sagemaker-pipeline-compare-model-versions/notebook.ipynb
+* 
