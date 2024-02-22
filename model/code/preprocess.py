@@ -10,7 +10,7 @@ disable_caching()
 LOGGER = logging.getLogger(__name__)
 
 
-def preprocess(
+def preprocess_dataset(
     dataset: DatasetDict, tokenizer: AutoTokenizer, labels_ref: List[str]
 ) -> DatasetDict:
     """
@@ -18,24 +18,21 @@ def preprocess(
     """
     LOGGER.info(f"Dataset info: {dataset}")
     processed_dataset = dataset.map(
-        batched_map_fn,
+        preprocess,
         fn_kwargs={"tokenizer": tokenizer, "labels_ref": labels_ref},
         remove_columns=dataset["train"].column_names,
         keep_in_memory=False,
         batched=True
-    ).with_format("torch")
-
-    # assert encoding["input_ids"].shape[-1] == tokenizer.model_max_length
-    # assert len(encoding["labels"]) == tokenizer.model_max_length
-    # assert len(encoding["bbox"]) == tokenizer.model_max_length
+    )
 
     return processed_dataset
 
 
-def batched_map_fn(
+def preprocess(
     element: Mapping, 
     tokenizer: AutoTokenizer, 
-    labels_ref: List[str]
+    labels_ref: List[str],
+    inference_mode: bool = False
 ) -> Mapping:
     """https://huggingface.co/docs/transformers/main_classes/tokenizer#transformers.PreTrainedTokenizer.__call__"""
     encoding: BatchEncoding = tokenizer(
@@ -57,7 +54,17 @@ def batched_map_fn(
         heights=element["original_height"],
         max_tokens=tokenizer.model_max_length,
     )
-    return encoding
+
+    encoding = encoding.convert_to_tensors(tensor_type="pt") # For labels and bbox
+    
+    assert encoding["input_ids"].shape[-1] == tokenizer.model_max_length
+    assert encoding["labels"].shape[-1] == tokenizer.model_max_length
+    assert encoding["bbox"].shape[1] == tokenizer.model_max_length
+
+    # For inference, we returns word_ids in addition to the preprocessed input
+    if inference_mode:
+        return encoding, encoding.word_ids()
+    return encoding 
 
 
 def align_labels(
