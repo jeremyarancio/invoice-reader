@@ -25,7 +25,11 @@ class LayoutLMEstimator(HuggingFace):
         # Metrics returned by the Trainer and tracked by SageMaker during training
         metrics_defintions = [
             {'Name': 'loss', 'Regex': "'loss': (.*?),"},
-            {'Name': 'learning_rate', 'Regex': "'learning_rate': (.*?),"}
+            {'Name': 'eval_loss', 'Regex': "'eval_loss': (.*?),"},
+            {'Name': 'learning_rate', 'Regex': "'learning_rate': (.*?),"},
+            {'Name': 'eval_overall_recall', 'Regex': "'eval_overall_recall': (.*?),"},
+            {'Name': 'eval_overall_f1', 'Regex': "'eval_overall_f1': (.*?),"},
+            {'Name': 'eval_overall_precision', 'Regex': "'eval_overall_precision': (.*?),"},
         ]
 
         super().__init__(

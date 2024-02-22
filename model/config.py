@@ -2,12 +2,6 @@ from dataclasses import dataclass
 
 
 @dataclass
-class HFModelConfig:
-  hf_model_id = "impira/layoutlm-invoices"
-  hf_task = "document-question-answering"
-
-
-@dataclass
 class EndpointDeploymentConfig:
   initial_instance_count = 1
   instance_type = "ml.t2.medium"
@@ -38,8 +32,8 @@ class ModelTrainingConfig:
     "Total net",
     "Total gross"
   ]
-  epochs = 1
-  per_device_train_batch_size = 16
-  per_device_eval_batch_size = 8
-  lr = 3e-5
+  epochs = 15
+  per_device_train_batch_size = 4
+  per_device_eval_batch_size = 4
+  lr = 5e-5
   dataset_uri = "s3://invoice-reader-project/data/training/datasets/dataset_ocr_v1/"

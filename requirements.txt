@@ -1,5 +1,4 @@
-transformers['pytorch']
 pytesseract
-datasets['s3]
-boto3
-sagemaker
+evaluate
+seqeval
+safetensors

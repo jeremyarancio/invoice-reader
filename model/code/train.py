@@ -12,8 +12,10 @@ from transformers import (
     TrainingArguments, 
     set_seed
 )
+import numpy as np
+import evaluate
 
-from preprocess import preprocess
+from preprocess import preprocess_dataset
 
 
 LOGGER = logging.getLogger(__name__)
@@ -77,6 +79,29 @@ def train(args):
     id2label = {v: k for v, k in enumerate(args.labels)}
     label2id = {k: v for v, k in enumerate(args.labels)}
 
+    
+    def compute_metrics(p):
+        metric = evaluate.load("seqeval")
+
+        predictions, labels = p
+        predictions = np.argmax(predictions, axis=2)
+
+        true_predictions = [
+            [args.labels[p] for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        true_labels = [
+            [args.labels[l] for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        
+        # Seqeval requires BIO scheme for evaluation
+        true_predictions = [["B-" + label if label != "O" else label for label in labels] for labels in true_predictions]
+        true_labels = [["B-" + label if label != "O" else label for label in labels] for labels in true_labels]
+
+        results = metric.compute(predictions=true_predictions, references=true_labels)
+        return results
+    
     LOGGER.info(f"Load model and tokenizer from {args.pretrained_model_name}, with labels {id2label} ")
     tokenizer = LayoutLMTokenizerFast.from_pretrained(args.pretrained_model_name)
     model = LayoutLMForTokenClassification.from_pretrained(
@@ -87,7 +112,7 @@ def train(args):
     )
 
     LOGGER.info("Start preprocessing.")
-    preprocessed_dataset = preprocess(
+    preprocessed_dataset = preprocess_dataset(
         dataset=load_from_disk(dataset_path=args.dataset_dir),
         tokenizer=tokenizer,
         labels_ref=args.labels
@@ -117,7 +142,8 @@ def train(args):
         model=model,
         args=training_args,
         train_dataset=preprocessed_dataset["train"],
-        eval_dataset=preprocessed_dataset["test"]
+        eval_dataset=preprocessed_dataset["test"],
+        compute_metrics=compute_metrics
     )
 
     LOGGER.info("Start training:")

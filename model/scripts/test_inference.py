@@ -18,7 +18,7 @@ def convert_to_bytes(image: Image) -> str:
 # image_serializer = IdentitySerializer() # using x-image to support multiple image formats
 
 predictor = HuggingFacePredictor(
-    endpoint_name="huggingface-pytorch-inference-2024-01-30-17-40-07-790",
+    endpoint_name="huggingface-pytorch-inference-2024-01-31-10-38-00-160",
     sagemaker_session=Session(),
     # serializer=IdentitySerializer()
 )
