@@ -86,4 +86,21 @@ pip install pdf2image
 * [Create SageMaker Pipelines for training, consuming and monitoring your batch use cases](https://aws.amazon.com/blogs/machine-learning/create-sagemaker-pipelines-for-training-consuming-and-monitoring-your-batch-use-cases/)
 * [Automate Machine Learning Workflows](https://aws.amazon.com/tutorials/machine-learning-tutorial-mlops-automate-ml-workflows/)
 * https://github.com/aws/amazon-sagemaker-examples/blob/main/sagemaker-pipeline-compare-model-versions/notebook.ipynb
-* 
+
+## If I had to start over
+
+* Objectives
+* Data
+* Models design
+* Prepare Benchmark (should not be relative to training data)
+* Evaluate existing solutions
+* ML
+  * Prepare sample of data for first model
+  * Preprocess
+  * Cloud:
+    * Explore model training using Cloud
+    * Inference
+  * Prepare Estimator + Inference + Preprocess + W&B (or similar)
+  * Sagemaker Training jobs
+  * Model registry
+  * Deployment 
