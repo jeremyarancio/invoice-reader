@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from sagemaker.huggingface import HuggingFace
+from comet_ml.integration.sagemaker import log_sagemaker_training_job_v1
 
 from config import EstimatorConfig, ModelTrainingConfig
 
