@@ -1,4 +1,12 @@
 pytesseract
+
+transformers['pytorch']
+datasets['s3']
 evaluate
 seqeval
 safetensors
+
+boto3
+sagemaker
+
+comet_ml
