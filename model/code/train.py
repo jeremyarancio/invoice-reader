@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 import sys
+from typing import List, Mapping, Callable
 
 from datasets import load_from_disk
 from transformers import (
@@ -14,6 +15,7 @@ from transformers import (
 )
 import numpy as np
 import evaluate
+import comet_ml
 
 from preprocess import preprocess_dataset
 
@@ -24,6 +26,8 @@ logging.basicConfig(
         handlers=[logging.StreamHandler(sys.stdout)],  # Necessary the catch training logging during training job²
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
+comet_ml.init(project_name="invoice-reader")
 
 
 def copy_scripts(path: str) -> None:
@@ -69,6 +73,71 @@ def parse_args():
     return args
 
 
+def prepare_compute_metrics(labels_ref: List[str]) -> Callable:
+    """labels_ref (_type_): List of categories for each token"""
+
+    def compute_metrics(p) -> Mapping:
+        """Trainer function to compute evaluation metrics."""
+        experiment = comet_ml.get_global_experiment()
+        metric = evaluate.load("seqeval")
+
+        predictions, labels = p
+        predictions = np.argmax(predictions, axis=2)
+
+        # Keep only labeled tokens
+        true_predictions = [
+            [p for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        true_labels = [
+            [l for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+
+        # Transform into str for Seqeval
+        true_predictions_str = [[labels_ref[p] for p in prediction] for prediction in true_predictions]
+        true_labels_str = [[labels_ref[l] for l in label] for label in true_labels]
+        
+        # Seqeval requires BIO scheme for evaluation
+        true_predictions = [["B-" + label if label != "O" else label for label in labels] for labels in true_predictions_str]
+        true_labels = [["B-" + label if label != "O" else label for label in labels] for labels in true_labels_str]
+
+        results = metric.compute(predictions=true_predictions, references=true_labels)
+
+        # Experiment tracking
+        if experiment:
+            epoch = int(experiment.curr_epoch) if experiment.curr_epoch is not None else 0
+            experiment.set_epoch(epoch)
+            experiment.log_confusion_matrix(
+                y_true=[label for batch in true_labels for label in batch], # flatten [[0,0,1,0], [1,0,1,0]] -> [0,0,1,0,1,0,1,0]
+                y_predicted=[pred for batch in true_predictions for pred in batch],
+                file_name=f"confusion-matrix-epoch-{epoch}.json",
+                labels=labels_ref
+            )
+
+            print(f"LABELS: {labels}")
+            print(f"PREDICTIONS: {predictions}")
+            print(f"RESULTS: {results}")
+
+            # Extract each metric from results
+            for metric_name, value in results.items():
+                if isinstance(value, dict):
+                    experiment.log_metrics(
+                        dic=value,
+                        prefix=metric_name,
+                        epoch=epoch
+                    )
+                elif isinstance(value, int):
+                    experiment.log_metric(
+                        name=metric_name, 
+                        value=value,
+                        epoch=epoch
+                    )
+
+        return results
+    return compute_metrics
+
+
 def train(args):
     """"""
     LOGGER.info("Start training script.")
@@ -78,29 +147,6 @@ def train(args):
 
     id2label = {v: k for v, k in enumerate(args.labels)}
     label2id = {k: v for v, k in enumerate(args.labels)}
-
-    
-    def compute_metrics(p):
-        metric = evaluate.load("seqeval")
-
-        predictions, labels = p
-        predictions = np.argmax(predictions, axis=2)
-
-        true_predictions = [
-            [args.labels[p] for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
-        ]
-        true_labels = [
-            [args.labels[l] for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
-        ]
-        
-        # Seqeval requires BIO scheme for evaluation
-        true_predictions = [["B-" + label if label != "O" else label for label in labels] for labels in true_predictions]
-        true_labels = [["B-" + label if label != "O" else label for label in labels] for labels in true_labels]
-
-        results = metric.compute(predictions=true_predictions, references=true_labels)
-        return results
     
     LOGGER.info(f"Load model and tokenizer from {args.pretrained_model_name}, with labels {id2label} ")
     tokenizer = LayoutLMTokenizerFast.from_pretrained(args.pretrained_model_name)
@@ -119,6 +165,8 @@ def train(args):
     )
 
     LOGGER.info(f"Preprocessed dataset: {preprocessed_dataset}")
+
+    compute_metrics = prepare_compute_metrics(labels_ref=args.labels)
 
     training_args = TrainingArguments(
         output_dir=args.output_dir,

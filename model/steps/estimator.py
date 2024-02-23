@@ -23,6 +23,7 @@ class LayoutLMEstimator(HuggingFace):
         }
 
         # Metrics returned by the Trainer and tracked by SageMaker during training
+        # Warning: the log frequency is about 1min, whihc means logs are lost
         metrics_defintions = [
             {'Name': 'loss', 'Regex': "'loss': (.*?),"},
             {'Name': 'eval_loss', 'Regex': "'eval_loss': (.*?),"},
@@ -47,7 +48,10 @@ class LayoutLMEstimator(HuggingFace):
             py_version            = EstimatorConfig.py_version,                             # the python version used in the training job
             hyperparameters       = hyperparameters,                                        # the hyperparameters used for the training job
             metric_definitions    = metrics_defintions,                                     # the metrics used to track the training job
-            environment           = {"HUGGINGFACE_HUB_CACHE": "/tmp/.cache" },              # set env variable to cache models in /tmp
+            environment           = {
+                "HUGGINGFACE_HUB_CACHE": "/tmp/.cache",
+                "COMET_API_KEY": os.getenv("COMET_API_KEY")
+            },                                                                              # set env variables
     )
 
 

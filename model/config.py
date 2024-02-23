@@ -32,8 +32,8 @@ class ModelTrainingConfig:
     "Total net",
     "Total gross"
   ]
-  epochs = 15
-  per_device_train_batch_size = 4
-  per_device_eval_batch_size = 4
+  epochs = 10
+  per_device_train_batch_size = 16
+  per_device_eval_batch_size = 8
   lr = 5e-5
   dataset_uri = "s3://invoice-reader-project/data/training/datasets/dataset_ocr_v1/"

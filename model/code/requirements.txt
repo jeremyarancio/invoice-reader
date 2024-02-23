@@ -2,3 +2,4 @@ pytesseract
 evaluate
 seqeval
 safetensors
+comet_ml
