@@ -1,0 +1,20 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train script",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "model/code/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset_dir", "s3://invoice-reader-project/data/training/datasets/dataset_ocr_v1/", 
+                "--labels", "O", "S-name", "S-adress", "B-name", "B-adress", "Total net", "Total gross",
+                "--output_dir", "output_dir_test/"
+            ]
+        }
+    ]
+}
