@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 from sagemaker.huggingface import HuggingFace
-from comet_ml.integration.sagemaker import log_sagemaker_training_job_v1
 
 from config import EstimatorConfig, ModelTrainingConfig
 
@@ -20,7 +19,8 @@ class LayoutLMEstimator(HuggingFace):
             "per_device_eval_batch_size": ModelTrainingConfig.per_device_eval_batch_size,
             "lr": ModelTrainingConfig.lr,
             "pretrained_model_name": ModelTrainingConfig.pretrained_model_name,
-            "labels": " ".join(f"'{label}'" for label in ModelTrainingConfig.labels),
+            "labels": " ".join(f"'{label}'" for label in ModelTrainingConfig.labels), # Compute metrics
+            "output_path": EstimatorConfig.training_jobs_uri
         }
 
         # Metrics returned by the Trainer and tracked by SageMaker during training

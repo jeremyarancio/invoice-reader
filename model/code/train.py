@@ -4,6 +4,7 @@ import os
 import shutil
 import sys
 from typing import List, Mapping, Callable
+import json
 
 from datasets import load_from_disk
 from transformers import (
@@ -15,7 +16,7 @@ from transformers import (
 )
 import numpy as np
 import evaluate
-import comet_ml
+from comet_ml import Experiment, get_global_experiment
 
 from preprocess import preprocess_dataset
 
@@ -27,7 +28,16 @@ logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-comet_ml.init(project_name="invoice-reader")
+# Comet ML experiment
+experiment = Experiment(
+    project_name="invoice-reader",
+    auto_metric_logging=False,
+    auto_param_logging=False,
+    parse_args=False
+)
+
+SM_TRAINING_ENV = json.loads(os.getenv("SM_TRAINING_ENV"))  # Need to be deserialized
+SM_JOB_NAME = SM_TRAINING_ENV["job_name"]
 
 
 def copy_scripts(path: str) -> None:
@@ -68,74 +78,10 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42, help="Seed.")
     # parser.add_argument("--fp16", type=strtobool, default=True if torch.cuda.get_device_capability()[0] == 8 else False, help="Whether to use bf16.")
     parser.add_argument("--labels", nargs='+', type=str, help="List of labels.")
+    parser.add_argument("--output_path", type=str, help="Training job artifact URI")
     
     args = parser.parse_known_args()
     return args
-
-
-def prepare_compute_metrics(labels_ref: List[str]) -> Callable:
-    """labels_ref (_type_): List of categories for each token"""
-
-    def compute_metrics(p) -> Mapping:
-        """Trainer function to compute evaluation metrics."""
-        experiment = comet_ml.get_global_experiment()
-        metric = evaluate.load("seqeval")
-
-        predictions, labels = p
-        predictions = np.argmax(predictions, axis=2)
-
-        # Keep only labeled tokens
-        true_predictions = [
-            [p for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
-        ]
-        true_labels = [
-            [l for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
-        ]
-
-        # Transform into str for Seqeval
-        true_predictions_str = [[labels_ref[p] for p in prediction] for prediction in true_predictions]
-        true_labels_str = [[labels_ref[l] for l in label] for label in true_labels]
-        
-        # Seqeval requires BIO scheme for evaluation
-        true_predictions = [["B-" + label if label != "O" else label for label in labels] for labels in true_predictions_str]
-        true_labels = [["B-" + label if label != "O" else label for label in labels] for labels in true_labels_str]
-
-        results = metric.compute(predictions=true_predictions, references=true_labels)
-
-        # Experiment tracking
-        if experiment:
-            epoch = int(experiment.curr_epoch) if experiment.curr_epoch is not None else 0
-            experiment.set_epoch(epoch)
-            experiment.log_confusion_matrix(
-                y_true=[label for batch in true_labels for label in batch], # flatten [[0,0,1,0], [1,0,1,0]] -> [0,0,1,0,1,0,1,0]
-                y_predicted=[pred for batch in true_predictions for pred in batch],
-                file_name=f"confusion-matrix-epoch-{epoch}.json",
-                labels=labels_ref
-            )
-
-            print(f"LABELS: {labels}")
-            print(f"PREDICTIONS: {predictions}")
-            print(f"RESULTS: {results}")
-
-            # Extract each metric from results
-            for metric_name, value in results.items():
-                if isinstance(value, dict):
-                    experiment.log_metrics(
-                        dic=value,
-                        prefix=metric_name,
-                        epoch=epoch
-                    )
-                elif isinstance(value, int):
-                    experiment.log_metric(
-                        name=metric_name, 
-                        value=value,
-                        epoch=epoch
-                    )
-
-        return results
-    return compute_metrics
 
 
 def train(args):
@@ -144,6 +90,10 @@ def train(args):
     LOGGER.info(f"Parameters implemented:\n {args}")
 
     set_seed(args.seed)
+    
+    experiment = get_global_experiment()
+    experiment.add_tags(["LayoutLM", "Test"])
+    experiment.log_parameters(vars(args))
 
     id2label = {v: k for v, k in enumerate(args.labels)}
     label2id = {k: v for v, k in enumerate(args.labels)}
@@ -166,8 +116,68 @@ def train(args):
 
     LOGGER.info(f"Preprocessed dataset: {preprocessed_dataset}")
 
-    compute_metrics = prepare_compute_metrics(labels_ref=args.labels)
+    def compute_metrics(p) -> Mapping:
+        """Trainer function to compute evaluation metrics."""
 
+        experiment = get_global_experiment()
+        metric = evaluate.load("seqeval")
+
+        predictions, labels = p
+        predictions = np.argmax(predictions, axis=2)
+
+        # Keep only labeled tokens
+        true_predictions = [
+            [p for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        true_labels = [
+            [l for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+
+        # Transform into str for Seqeval
+        true_predictions_str = [[args.labels[p] for p in prediction] for prediction in true_predictions]
+        true_labels_str = [[args.labels[l] for l in label] for label in true_labels]
+        
+        # Seqeval requires BIO scheme for evaluation
+        BIO_predictions = [["B-" + label if label != "O" else label for label in labels] for labels in true_predictions_str]
+        BIO_labels = [["B-" + label if label != "O" else label for label in labels] for labels in true_labels_str]
+
+        results = metric.compute(predictions=BIO_predictions, references=BIO_labels)
+
+        LOGGER.info(f"Labels for confusion matrix: {[label for batch in true_labels for label in batch]}")
+        LOGGER.info(f"Preds for confusion matrix: {[pred for batch in true_predictions for pred in batch]}")
+
+        # Experiment tracking
+        if experiment:
+            epoch = int(experiment.curr_epoch) if experiment.curr_epoch is not None else 0
+            experiment.set_epoch(epoch)
+            experiment.log_confusion_matrix(
+                y_true=[label for batch in true_labels for label in batch], # flatten [[0,0,1,0], [1,0,1,0]] -> [0,0,1,0,1,0,1,0]
+                y_predicted=[pred for batch in true_predictions for pred in batch],
+                file_name=f"confusion-matrix-epoch-{epoch}.json",
+                labels=args.labels
+            )
+
+            LOGGER.info(f"Metric dict: {results}")
+            # Extract each metric from results
+            for metric_name, value in results.items():
+                if isinstance(value, dict):
+                    experiment.log_metrics(
+                        dic=value,
+                        prefix=metric_name,
+                        epoch=epoch
+                    )
+                else:
+                    experiment.log_metric(
+                        name=metric_name, 
+                        value=value,
+                        epoch=epoch
+                    )
+        else:
+            LOGGER.warning("Experiment from compute_metrics() is not found.")
+        return results
+    
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         num_train_epochs=args.epochs,
@@ -201,6 +211,11 @@ def train(args):
     LOGGER.info("Start saving tokenizer and model into model artifact.")
     tokenizer.save_pretrained(args.output_dir)
     trainer.model.save_pretrained(args.output_dir, safe_serialization=True)
+
+    # Log remote model with CometML and S3
+    training_job_uri = os.path.join(args.output_path, SM_JOB_NAME)
+    LOGGER.info(f"Training job uri: {training_job_uri}")
+    experiment.log_remote_model("LayoutLM", training_job_uri)
 
     LOGGER.info("Training script finished.")
 
