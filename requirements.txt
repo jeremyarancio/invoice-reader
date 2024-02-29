@@ -1,7 +1,7 @@
 pytesseract
 
-transformers['pytorch']
-datasets['s3']
+transformers [pytorch]
+datasets [s3]
 evaluate
 seqeval
 safetensors
