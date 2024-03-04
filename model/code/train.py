@@ -3,7 +3,7 @@ import logging
 import os
 import shutil
 import sys
-from typing import List, Mapping, Callable
+from typing import Mapping
 import json
 
 from datasets import load_from_disk
@@ -16,7 +16,7 @@ from transformers import (
 )
 import numpy as np
 import evaluate
-from comet_ml import Experiment, get_global_experiment
+import comet_ml
 
 from preprocess import preprocess_dataset
 
@@ -26,14 +26,6 @@ logging.basicConfig(
         level=logging.getLevelName("INFO"),
         handlers=[logging.StreamHandler(sys.stdout)],  # Necessary the catch training logging during training job²
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
-# Comet ML experiment
-experiment = Experiment(
-    project_name="invoice-reader",
-    auto_metric_logging=False,
-    auto_param_logging=False,
-    parse_args=False
 )
 
 SM_TRAINING_ENV = json.loads(os.getenv("SM_TRAINING_ENV"))  # Need to be deserialized
@@ -84,16 +76,14 @@ def parse_args():
     return args
 
 
-def train(args):
-    """"""
+if __name__ == "__main__":
+
+    args, _ = parse_args()
+
     LOGGER.info("Start training script.")
     LOGGER.info(f"Parameters implemented:\n {args}")
 
     set_seed(args.seed)
-    
-    experiment = get_global_experiment()
-    experiment.add_tags(["LayoutLM", "Test"])
-    experiment.log_parameters(vars(args))
 
     id2label = {v: k for v, k in enumerate(args.labels)}
     label2id = {k: v for v, k in enumerate(args.labels)}
@@ -119,7 +109,8 @@ def train(args):
     def compute_metrics(p) -> Mapping:
         """Trainer function to compute evaluation metrics."""
 
-        experiment = get_global_experiment()
+        experiment = comet_ml.get_global_experiment()
+        LOGGER.info(f"Experiment name in compute_metrics: {experiment.get_name()}")
         metric = evaluate.load("seqeval")
 
         predictions, labels = p
@@ -213,15 +204,20 @@ def train(args):
     trainer.model.save_pretrained(args.output_dir, safe_serialization=True)
 
     # Log remote model with CometML and S3
-    training_job_uri = os.path.join(args.output_path, SM_JOB_NAME)
-    LOGGER.info(f"Training job uri: {training_job_uri}")
-    experiment.log_remote_model("LayoutLM", training_job_uri)
+    experiment = comet_ml.get_global_experiment()
+    LOGGER.info(f"Experiment name after Transformers trainer: {experiment.get_name()}")
+    experiment = comet_ml.ExistingExperiment(experiment_key=experiment.get_key())
+    experiment.add_tags(["LayoutLM", "Test"])
+    experiment.log_parameters(vars(args))
+
+    model_uri = os.path.join(args.output_path, SM_JOB_NAME, "output/model.tar.gz")
+    LOGGER.info(f"Training job uri: {model_uri}")
+    experiment.log_remote_model(
+        "LayoutLM", 
+        model_uri, 
+        sync_mode=False
+    )
 
     LOGGER.info("Training script finished.")
 
-
-if __name__ == "__main__":
-
-    args, _ = parse_args()
-    train(args)
     copy_scripts(os.path.join(args.output_dir, "code"))

@@ -51,7 +51,8 @@ class LayoutLMEstimator(HuggingFace):
             metric_definitions    = metrics_defintions,                                     # the metrics used to track the training job
             environment           = {
                 "HUGGINGFACE_HUB_CACHE": "/tmp/.cache",
-                "COMET_API_KEY": os.getenv("COMET_API_KEY")
+                    "COMET_API_KEY": os.getenv("COMET_API_KEY"),
+                    "COMET_PROJECT_NAME": "invoice-reader"
             },                                                                              # set env variables
     )
 
