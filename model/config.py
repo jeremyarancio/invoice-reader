@@ -18,6 +18,9 @@ class EstimatorConfig:
   transformers_version = "4.26"
   pytorch_version = "1.13"
   py_version = "py39"
+  tags = "LayoutLM" # CometML experiment tags -> Need to be a string for environment variable in Training jobs
+  comet_project_name = "invoice-reader"
+
 
 
 @dataclass
@@ -32,8 +35,9 @@ class ModelTrainingConfig:
     "Total net",
     "Total gross"
   ]
-  epochs = 10
+  epochs = 20
   per_device_train_batch_size = 16
   per_device_eval_batch_size = 8
   lr = 5e-5
+  warmup_steps = 10
   dataset_uri = "s3://invoice-reader-project/data/training/datasets/dataset_ocr_v1/"

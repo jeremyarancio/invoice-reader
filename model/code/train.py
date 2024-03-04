@@ -30,6 +30,7 @@ logging.basicConfig(
 
 SM_TRAINING_ENV = json.loads(os.getenv("SM_TRAINING_ENV"))  # Need to be deserialized
 SM_JOB_NAME = SM_TRAINING_ENV["job_name"]
+EXPERIMENT_TAGS = os.getenv("EXPERIMENT_TAGS").split(",") # "LayoutLM, Test" -> ["LayoutLM", "Test"]
 
 
 def copy_scripts(path: str) -> None:
@@ -68,6 +69,7 @@ def parse_args():
     parser.add_argument("--per_device_eval_batch_size", type=int, default=16, help="Eval batch size.")
     parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate.")
     parser.add_argument("--seed", type=int, default=42, help="Seed.")
+    parser.add_argument("--warmup_steps", type=int, default=0, help="Number of steps used for a linear warmup from 0 to `learning_rate`")
     # parser.add_argument("--fp16", type=strtobool, default=True if torch.cuda.get_device_capability()[0] == 8 else False, help="Whether to use bf16.")
     parser.add_argument("--labels", nargs='+', type=str, help="List of labels.")
     parser.add_argument("--output_path", type=str, help="Training job artifact URI")
@@ -174,6 +176,7 @@ if __name__ == "__main__":
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
+        warmup_steps=args.warmup_steps,
         # fp16=args.fp16,
         learning_rate=args.lr,
         # logging & evaluation strategies
@@ -207,7 +210,7 @@ if __name__ == "__main__":
     experiment = comet_ml.get_global_experiment()
     LOGGER.info(f"Experiment name after Transformers trainer: {experiment.get_name()}")
     experiment = comet_ml.ExistingExperiment(experiment_key=experiment.get_key())
-    experiment.add_tags(["LayoutLM", "Test"])
+    experiment.add_tags(EXPERIMENT_TAGS)
     experiment.log_parameters(vars(args))
 
     model_uri = os.path.join(args.output_path, SM_JOB_NAME, "output/model.tar.gz")

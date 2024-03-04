@@ -20,7 +20,8 @@ class LayoutLMEstimator(HuggingFace):
             "lr": ModelTrainingConfig.lr,
             "pretrained_model_name": ModelTrainingConfig.pretrained_model_name,
             "labels": " ".join(f"'{label}'" for label in ModelTrainingConfig.labels), # Compute metrics
-            "output_path": EstimatorConfig.training_jobs_uri
+            "output_path": EstimatorConfig.training_jobs_uri,
+            "warmup_steps": ModelTrainingConfig.warmup_steps
         }
 
         # Metrics returned by the Trainer and tracked by SageMaker during training
@@ -35,25 +36,26 @@ class LayoutLMEstimator(HuggingFace):
         ]
 
         super().__init__(
-            entry_point           = EstimatorConfig.entry_point,                                # train script
+            entry_point           = EstimatorConfig.entry_point,                                  # train script
             source_dir            = str(Path(os.path.dirname(os.path.realpath(__file__))).parent 
-                                        / EstimatorConfig.source_dir_path),                                 # directory which includes all the files needed for training
-            output_path           = EstimatorConfig.training_jobs_uri,                       # s3 path to save the artifacts
-            code_location         = EstimatorConfig.training_jobs_uri,                       # s3 path to stage the code during the training job
-            instance_type         = EstimatorConfig.instance_type,                           # instances type used for the training job
-            instance_count        = EstimatorConfig.instance_count,                          # the number of instances used for training
-            base_job_name         = EstimatorConfig.job_name,                                # the name of the training job
-            role                  = os.getenv('SAGEMAKER_ROLE'),                                       # Iam role used in training job to access AWS ressources, e.g. S3
-            transformers_version  = EstimatorConfig.transformers_version,                   # the transformers version used in the training job
-            pytorch_version       = EstimatorConfig.pytorch_version,                        # the pytorch_version version used in the training job
-            py_version            = EstimatorConfig.py_version,                             # the python version used in the training job
-            hyperparameters       = hyperparameters,                                        # the hyperparameters used for the training job
-            metric_definitions    = metrics_defintions,                                     # the metrics used to track the training job
+                                        / EstimatorConfig.source_dir_path),                       # directory which includes all the files needed for training
+            output_path           = EstimatorConfig.training_jobs_uri,                            # s3 path to save the artifacts
+            code_location         = EstimatorConfig.training_jobs_uri,                            # s3 path to stage the code during the training job
+            instance_type         = EstimatorConfig.instance_type,                                # instances type used for the training job
+            instance_count        = EstimatorConfig.instance_count,                               # the number of instances used for training
+            base_job_name         = EstimatorConfig.job_name,                                     # the name of the training job
+            role                  = os.getenv('SAGEMAKER_ROLE'),                                  # Iam role used in training job to access AWS ressources, e.g. S3
+            transformers_version  = EstimatorConfig.transformers_version,                         # the transformers version used in the training job
+            pytorch_version       = EstimatorConfig.pytorch_version,                              # the pytorch_version version used in the training job
+            py_version            = EstimatorConfig.py_version,                                   # the python version used in the training job
+            hyperparameters       = hyperparameters,                                              # the hyperparameters used for the training job
+            metric_definitions    = metrics_defintions,                                           # the metrics used to track the training job
             environment           = {
                 "HUGGINGFACE_HUB_CACHE": "/tmp/.cache",
-                    "COMET_API_KEY": os.getenv("COMET_API_KEY"),
-                    "COMET_PROJECT_NAME": "invoice-reader"
-            },                                                                              # set env variables
+                "COMET_API_KEY": os.getenv("COMET_API_KEY"),
+                "COMET_PROJECT_NAME": EstimatorConfig.comet_project_name,
+                "EXPERIMENT_TAGS": EstimatorConfig.tags
+            },
     )
 
 
