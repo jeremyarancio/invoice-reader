@@ -212,6 +212,8 @@ if __name__ == "__main__":
     experiment = comet_ml.ExistingExperiment(experiment_key=experiment.get_key())
     experiment.add_tags(EXPERIMENT_TAGS)
     experiment.log_parameters(vars(args))
+    # Log preprocess.py code
+    experiment.log_code(os.path.join(os.path.dirname(os.path.realpath(__file__)), "preprocess.py"))
 
     model_uri = os.path.join(args.output_path, SM_JOB_NAME, "output/model.tar.gz")
     LOGGER.info(f"Training job uri: {model_uri}")
