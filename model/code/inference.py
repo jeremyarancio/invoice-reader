@@ -4,10 +4,13 @@ import sys
 import json
 from PIL import Image
 import requests
+from subprocess import run
 
 from transformers import LayoutLMForTokenClassification, AutoProcessor
 import torch
 
+
+run("sudo apt install -y tesseract-ocr", shell=True, check=True)
 
 logging.basicConfig(
     level=logging.getLevelName("INFO"),
@@ -31,25 +34,30 @@ def model_fn(model_dir):
 def input_fn(input_data, content_type):
     if content_type == "application/json":
         data = json.loads(input_data)
-        url = data.pop("url", None)
-        image = get_image_from_url(url)
-        return image
+        urls = data.pop("urls", None)
+        if urls:
+            images = [get_image_from_url(url) for url in urls]
+            return images
+        else:
+            raise ValueError("No document url was provided.")
     else:
         raise ValueError("Content type {} is not supported.".format(content_type))
 
 
-def predict_fn(image, model):
+def predict_fn(images, model):
+    logging.info("Start predict_fn.")
     processor, model = model
     encoding = processor(
-        image, return_tensors="pt", 
+        images, 
+        return_tensors="pt", 
         padding="max_length", 
         truncation=True
     )
-    image = encoding.pop("image")
+    del encoding["image"]
     outputs = model(**encoding)
     results = process_outputs(
         outputs, encoding=encoding, 
-        image=image, model=model, 
+        images=images, model=model, 
         processor=processor
     )
     return results
@@ -80,10 +88,10 @@ def unnormalize_box(bbox, width, height):
     ]
 
 
-def _process_outputs(encoding, tokenizer, labels, scores, image_size):
-    width, height = image_size
+def _process_outputs(encoding, tokenizer, labels, scores, images):
     results = []
     for batch_idx, input_ids in enumerate(encoding["input_ids"]):
+        width, height = images[batch_idx].size
         entities = []
         previous_word_idx = 0
         tokens = tokenizer.convert_ids_to_tokens(input_ids)
@@ -112,12 +120,13 @@ def _process_outputs(encoding, tokenizer, labels, scores, image_size):
             previous_word_idx = word_idx
         for entity in entities:
             entity["word"] = entity["word"].replace("##", "")
-        results.append(entity)
+        results.append(entities)
     return results
 
 
-def process_outputs(outputs, encoding, image, model, processor):
+def process_outputs(outputs, encoding, images, model, processor):
     scores, _ = torch.max(outputs.logits.softmax(axis=-1), dim=-1)
+    scores = scores.tolist()
     predictions = outputs.logits.argmax(-1)
     labels = [[model.config.id2label[pred.item()] for pred in prediction] for prediction in predictions]
     results = _process_outputs(
@@ -125,6 +134,32 @@ def process_outputs(outputs, encoding, image, model, processor):
         tokenizer=processor.tokenizer,
         labels=labels,
         scores=scores,
-        image_size=image.size,
+        images=images,
     )
     return results
+
+
+if __name__ == "__main__":
+    
+    import boto3
+
+    BUCKET = "invoice-reader-project"
+    KEYS = ["data/training/documents/invoice_0.png", "data/training/documents/invoice_1.png"]
+    s3 = boto3.client("s3")
+
+    urls = []
+    for key in KEYS:
+        urls.append(
+            s3.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={"Bucket": BUCKET, "Key": key},
+                ExpiresIn=3600,
+            )
+        )
+    payload = {"urls": urls}
+
+    results = predict_fn(
+        input_fn(input_data=json.dumps(payload), content_type="application/json"),
+        model_fn(model_dir="artifact")
+    )
+    print(results)
