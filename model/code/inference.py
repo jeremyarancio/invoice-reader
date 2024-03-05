@@ -41,12 +41,16 @@ def input_fn(input_data, content_type):
 def predict_fn(image, model):
     processor, model = model
     encoding = processor(
-        image, return_tensors="pt", padding="max_length", truncation=True
+        image, return_tensors="pt", 
+        padding="max_length", 
+        truncation=True
     )
     image = encoding.pop("image")
     outputs = model(**encoding)
     results = process_outputs(
-        outputs, encoding=encoding, image=image, model=model, processor=processor
+        outputs, encoding=encoding, 
+        image=image, model=model, 
+        processor=processor
     )
     return results
 
