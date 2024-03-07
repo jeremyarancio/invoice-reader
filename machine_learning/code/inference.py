@@ -4,13 +4,14 @@ import sys
 import json
 from PIL import Image
 import requests
-from subprocess import run
+import os
 
 from transformers import LayoutLMForTokenClassification, AutoProcessor
 import torch
 
-run("apt-get update", shell=True, check=True)
-run("apt install -y tesseract-ocr", shell=True, check=True)
+os.system('chmod 777 /tmp')
+os.system('apt-get update -y')
+os.system('apt-get install tesseract-ocr -y')
 
 logging.basicConfig(
     level=logging.getLevelName("INFO"),
