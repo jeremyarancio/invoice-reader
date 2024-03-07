@@ -4,7 +4,13 @@ from dataclasses import dataclass
 @dataclass
 class EndpointDeploymentConfig:
   initial_instance_count = 1
-  instance_type = "ml.t2.medium"
+  instance_type = "ml.t2.large"
+  py_version = "py39"
+  pytorch_version = "1.13"
+  transformers_version="4.26"
+  entry_point = "inference.py"
+  model_data = "s3://invoice-reader-project/training-jobs/layoutLMTraining-2024-03-04-09-40-39-507/output/model.tar.gz" # S3 artifact
+
 
 
 @dataclass
