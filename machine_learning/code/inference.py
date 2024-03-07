@@ -9,8 +9,8 @@ from subprocess import run
 from transformers import LayoutLMForTokenClassification, AutoProcessor
 import torch
 
-run("sudo apt-get update", shell=True, check=True)
-run("sudo apt install -y tesseract-ocr", shell=True, check=True)
+run("apt-get update", shell=True, check=True)
+run("apt install -y tesseract-ocr", shell=True, check=True)
 
 logging.basicConfig(
     level=logging.getLevelName("INFO"),
