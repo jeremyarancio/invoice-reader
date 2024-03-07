@@ -9,7 +9,7 @@ import os
 from transformers import LayoutLMForTokenClassification, AutoProcessor
 import torch
 
-os.system('chmod 777 /tmp')
+os.system('chmod 777 /tmp') # https://discuss.huggingface.co/t/how-to-install-tesseract-ocr-in-a-training-dlc-of-hf-via-a-script/19251/6
 os.system('apt-get update -y')
 os.system('apt-get install tesseract-ocr -y')
 
