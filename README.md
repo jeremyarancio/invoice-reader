@@ -104,3 +104,16 @@ pip install pdf2image
   * Sagemaker Training jobs
   * Model registry
   * Deployment 
+
+
+## Deployment
+
+* If `inference.py` is added as an `entry_point`, it will repack the S3 artifact which takes a lot of time
+* Maybe it's better to have the script ready during the training stage. 
+* Error message: 
+
+```
+sagemaker.exceptions.UnexpectedStatusException: Error hosting endpoint huggingface-pytorch-inference-2024-03-07-10-01-23-289: Failed. Reason: Failed to extract model data archive from URL "s3://sagemaker-eu-central-1-265890761777/huggingface-pytorch-inference-2024-03-07-09-41-59-363/model.tar.gz". The model data archive is too large. Please reduce the size of the model data archive or move to an instance type with more memory.. Try changing the instance type or reference the troubleshooting page https://docs.aws.amazon.com/sagemaker/latest/dg/async-inference-troubleshooting.html
+```
+* It looks like the decompress -> add file -> compress is done on my computer, that's why it's so slow (25min / 2.5GB)
+* Possibility to repack model using Lambda or Lambda step?

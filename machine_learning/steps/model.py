@@ -2,6 +2,7 @@ import logging
 import os
 
 from sagemaker.huggingface import HuggingFaceModel
+from sagemaker.serverless import ServerlessInferenceConfig
 
 from config import EndpointDeploymentConfig
 
@@ -10,6 +11,13 @@ LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 ROLE = os.getenv("SAGEMAKER_ROLE")
 SOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../code")
+
+
+# Specify MemorySizeInMB and MaxConcurrency in the serverless config object
+serverless_inference_config = ServerlessInferenceConfig(
+    memory_size_in_mb=EndpointDeploymentConfig.memory_size_in_mb, 
+    max_concurrency=EndpointDeploymentConfig.max_concurrency,
+)
 
 
 class LayoutLMModel(HuggingFaceModel):
@@ -34,9 +42,7 @@ class LayoutLMModel(HuggingFaceModel):
 
 if __name__ == "__main__":
     model = LayoutLMModel().deploy(
-        initial_instance_count=EndpointDeploymentConfig.initial_instance_count,
-        instance_type=EndpointDeploymentConfig.instance_type,
-        volume_size=30
+        serverless_inference_config=serverless_inference_config
     )
 
 

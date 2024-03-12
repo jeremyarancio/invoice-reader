@@ -10,7 +10,9 @@ class EndpointDeploymentConfig:
   transformers_version="4.26"
   entry_point = "inference.py"
   model_data = "s3://invoice-reader-project/training-jobs/layoutLMTraining-2024-03-04-09-40-39-507/output/model.tar.gz" # S3 artifact
-
+  # Serverless config
+  memory_size_in_mb = 4096
+  max_concurrency = 5
 
 
 @dataclass
