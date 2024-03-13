@@ -17,7 +17,7 @@ logging.basicConfig(
     level=logging.getLevelName("INFO"),
     handlers=[
         logging.StreamHandler(sys.stdout)
-    ],  # Necessary the catch training logging during training job²
+    ],
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
