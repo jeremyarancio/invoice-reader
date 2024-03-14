@@ -3,18 +3,21 @@ from dataclasses import dataclass
 
 @dataclass
 class EndpointDeploymentConfig:
+  endpoint_name = "layoutlm-invoice-endpoint-v1"
   initial_instance_count = 1
-  instance_type = "ml.t2.large"
+  instance_type = "ml.c5.xlarge"
   py_version = "py39"
   pytorch_version = "1.13"
   transformers_version="4.26"
   entry_point = "inference.py"
   model_data = "s3://invoice-reader-project/training-jobs/layoutLMTraining-2024-03-04-09-40-39-507/output/model.tar.gz" # S3 artifact
   # Serverless config
-  memory_size_in_mb = 3072
+  memory_size_in_mb = 5120
   max_concurrency = 5
-  endpoint_name = "layoutlm-invoice-endpoint-v1"
-
+  # Async config
+  max_concurrent_invocations_per_instance = 4
+  async_output_path = "s3://invoice-reader-project/production/async_output/"
+  async_input_path = "s3://invoice-reader-project/production/async_input/async_payload.json"
 
 @dataclass
 class EstimatorConfig:

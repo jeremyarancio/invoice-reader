@@ -3,6 +3,8 @@ import os
 
 from sagemaker.huggingface import HuggingFaceModel
 from sagemaker.serverless import ServerlessInferenceConfig
+from sagemaker.async_inference import AsyncInferenceConfig
+from sagemaker.serializers import JSONSerializer
 
 from config import EndpointDeploymentConfig
 
@@ -13,12 +15,21 @@ ROLE = os.getenv("SAGEMAKER_ROLE")
 SOURCE_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../code")
 
 
-# Specify MemorySizeInMB and MaxConcurrency in the serverless config object
-serverless_inference_config = ServerlessInferenceConfig(
-    memory_size_in_mb=EndpointDeploymentConfig.memory_size_in_mb, 
-    max_concurrency=EndpointDeploymentConfig.max_concurrency,
-)
+# # Specify MemorySizeInMB and MaxConcurrency in the serverless config object
+# serverless_inference_config = ServerlessInferenceConfig(
+#     memory_size_in_mb=EndpointDeploymentConfig.memory_size_in_mb, 
+#     max_concurrency=EndpointDeploymentConfig.max_concurrency,
+# )
 
+# create async endpoint configuration
+# async_config = AsyncInferenceConfig(
+#     output_path=EndpointDeploymentConfig.async_output_path,
+#     # notification_config={
+#             #   "SuccessTopic": "arn:aws:sns:us-east-2:123456789012:MyTopic",
+#             #   "ErrorTopic": "arn:aws:sns:us-east-2:123456789012:MyTopic",
+#     # }, #  Notification configuration
+#     max_concurrent_invocations_per_instance=EndpointDeploymentConfig.max_concurrent_invocations_per_instance,
+# )
 
 class LayoutLMModel(HuggingFaceModel):
     def __init__(
@@ -41,8 +52,18 @@ class LayoutLMModel(HuggingFaceModel):
 
 
 if __name__ == "__main__":
-    model = LayoutLMModel().deploy(
-        serverless_inference_config=serverless_inference_config
+    
+    # model = LayoutLMModel().deploy(
+    #     instance_type=EndpointDeploymentConfig.instance_type,
+    #     initial_instance_count=EndpointDeploymentConfig.initial_instance_count,
+    #     endpoint_name=EndpointDeploymentConfig.endpoint_name,
+    #     async_inference_config=async_config
+    # )
+
+    LayoutLMModel().deploy(
+        endpoint_name=EndpointDeploymentConfig.endpoint_name,
+        instance_type=EndpointDeploymentConfig.instance_type,
+        initial_instance_count=EndpointDeploymentConfig.initial_instance_count
     )
 
 
