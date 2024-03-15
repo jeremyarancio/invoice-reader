@@ -1,15 +1,6 @@
-import logging
-import json
-import urllib
-import time
-
 from sagemaker.predictor import Predictor
-from sagemaker.predictor_async import AsyncPredictor
-from sagemaker.async_inference.waiter_config import WaiterConfig
 from sagemaker import Session
 from sagemaker.serializers import JSONSerializer
-import boto3
-from botocore.exceptions import ClientError
 
 from config import EndpointDeploymentConfig
 

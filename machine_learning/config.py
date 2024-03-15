@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class EndpointDeploymentConfig:
-  endpoint_name = "layoutlm-invoice-endpoint-v1"
+  endpoint_name = "layoutlm-invoice-v1"
   initial_instance_count = 1
   instance_type = "ml.c5.xlarge"
   py_version = "py39"

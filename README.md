@@ -117,3 +117,8 @@ sagemaker.exceptions.UnexpectedStatusException: Error hosting endpoint huggingfa
 ```
 * It looks like the decompress -> add file -> compress is done on my computer, that's why it's so slow (25min / 2.5GB)
 * Possibility to repack model using Lambda or Lambda step?
+
+
+# AWS Deep Learning Containers
+
+https://github.com/aws/deep-learning-containers/blob/master/available_images.md
