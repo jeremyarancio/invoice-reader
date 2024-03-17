@@ -5,12 +5,6 @@ provider "aws" {
 # +-----------------------------------------------------------------
 # Variables 
 # +-----------------------------------------------------------------
-
-variable "transformers_version" {
-  type = string
-  default = "4.26"
-}
-
 variable "sagemaker_execution_role" {
   type = string
   description = "Sagemaker arn stored as an environment variable."
@@ -18,7 +12,7 @@ variable "sagemaker_execution_role" {
 
 variable "image_uri" {
   type = string
-  default = "763104351884.dkr.ecr.eu-central-1.amazonaws.com/pytorch-inference:1.13-cpu-py39"
+  default = "763104351884.dkr.ecr.eu-central-1.amazonaws.com/huggingface-pytorch-inference:1.13.1-transformers4.26.0-cpu-py39-ubuntu20.04"
   description = "Check the offfcial AWS repo: https://github.com/aws/deep-learning-containers/blob/master/available_images.md"
 }
 
@@ -61,7 +55,7 @@ resource "aws_sagemaker_endpoint_configuration" "sagemaker_endpoint_configuratio
     instance_type = "ml.c5.xlarge"
     model_name = aws_sagemaker_model.sagemaker_model.name
     variant_name = "AllTraffic"
-    container_startup_health_check_timeout_in_seconds = 200
+    container_startup_health_check_timeout_in_seconds = 300
   }
   tags = {
     Name = "terraform"
